@@ -1,6 +1,10 @@
 # History files
+*.pptx
 .Rhistory
 .Rapp.history
+/data/
+/blog/
+*.Rproj
 
 # Session Data files
 .RData
