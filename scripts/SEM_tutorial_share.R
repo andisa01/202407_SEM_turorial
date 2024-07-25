@@ -7,7 +7,7 @@
 
 # Set up the environment ====
 
-source("https://raw.githubusercontent.com/andisa01/andis_utils/main/00_HelperFunctions.R") # Andis' collection of helperfunctions
+# source("https://raw.githubusercontent.com/andisa01/andis_utils/main/00_HelperFunctions.R") # Andis' collection of helperfunctions
 
 # Install and load packages ====
 packages_for_sem_workshop <- 
@@ -36,8 +36,10 @@ install_and_load_packages(packages_for_sem_workshop)
 
 sessionInfo()
 
-# Simple model =====
+## Simple model =====
 # Simulate a toy dataset
+set.seed(999)
+
 simple_ex <-
   data.frame(
     x = runif(n = 100, min = 0, max = 10),
@@ -50,13 +52,13 @@ simple_ex <-
     y = 1 + 2.5*x + e
   )
 
-# . Fit simple regression ====
+## . Fit simple regression ====
 fit_simple_ex_lm <- 
   lm(y ~ x, data = simple_ex)
 
 summary(fit_simple_ex_lm)
 
-# . Fit simple SEM ====
+## . Fit simple SEM ====
 simple_ex_sem <-
   '
   y ~ x
@@ -69,17 +71,15 @@ fit_simple_ex_sem <-
 
 summary(fit_simple_ex_sem)
 
-mean(simple_ex$x)
-var(simple_ex$x)
 fit_simple_ex_lm %>%
   resid() %>%
   var()
 
-example01_data_anon <- read.csv("./data/example01_data_anon.csv")
+## Motivational example ====
+# . Get data ====
+source("https://raw.githubusercontent.com/andisa01/202407_SEM_turorial/main/scripts/SEM_tutorial_example_source.R")
 
-# A typical approach that most folks are trained in is to throw the varaibles into a regression and see if anything is significant.
-# Usually, we start with a fully interactive model and then work our way to more simple models. This is sometimes called backward stepwise regression, or dredging.
-
+## . Stepwise regression =====
 # Fit the full or 'global model'
 mod_ex01_full <- lm(Y ~ X1 + X2 + X1:X2, data = example01_data_anon)
 summary(mod_ex01_full)
@@ -94,15 +94,15 @@ lm(Y ~ X2, data = example01_data_anon) %>%
 # Now we have a significant result!!! We can explain 14% of the variation in Y with X2.
 # For every 1 unit increase of X2 we expect Y to increase by 0.16 units!!!
 
-# There's even a ackage for this: https://www.rdocumentation.org/packages/MuMIn/versions/1.48.4/topics/dredge
+# There's even a package for this: https://www.rdocumentation.org/packages/MuMIn/versions/1.48.4/topics/dredge
 options(na.action = "na.fail")
 MuMIn::dredge(mod_ex01_full)
 
 # Job done! Let's publish a paper?!
 
-# What if I told you that I actually simulated these data with a known relationship?
-
-# Let's visualize the possible relationships between these varaibles.
+## SEM modeling ====
+# . Consider other model structures ====
+# Visualize the alternative structures
 nodes <- 
   tibble(
     name = c("X1", "X2", "Y"),
@@ -142,13 +142,8 @@ graph01 %>%
   theme(legend.position = "none")
 
 # This is the assumtion that our regression model is making. Both X1 and X2 are independently affecting Y.
-# This is called a path diagram or DAG or directional network graph. The way to read these is to start at the top of the arrow and say, a change in this thing will change the value of the thing it is pointing to.
-# If this were really how the system was structured, then our modeling approach would be just fine.
-# For instance, if Y was fungal growth in soil plots, X1 is amount of moisture, and X2 is fugivore density. As long as moisture and fungivore density are independent (i.e. moisture doesn't cause more or less fungivore density and fungivore density doesn't increase or decrease moisture), then our model is totally fine.
-# This structure is called a collider. 
 
-# But what if our system was actually like this?
-
+# Chain
 edges <- 
   tibble(
     from = "X1",
@@ -172,12 +167,9 @@ tbl_graph(nodes = nodes, edges = edges, directed = TRUE) %>%
   scale_color_manual(values = c("input" = "blue", "output" = "red")) +
   scale_size_manual(values = c(15)) +
   theme(legend.position = "none")
-
 # Now X1 causes X2 which causes Y. This is called a chain.
-# Imagine ______
 
-# Or what about this?
-
+# Confounder mediation
 edges <- 
   tibble(
     from = "X1",
@@ -208,11 +200,9 @@ tbl_graph(nodes = nodes, edges = edges, directed = TRUE) %>%
   scale_color_manual(values = c("input" = "blue", "output" = "red")) +
   scale_size_manual(values = c(15)) +
   theme(legend.position = "none")
-
 # Here, X2 is a confounder.
 
-# Or what about this?
-
+# Partial mediator
 edges <- 
   tibble(
     from = "X1",
@@ -243,9 +233,9 @@ tbl_graph(nodes = nodes, edges = edges, directed = TRUE) %>%
   scale_color_manual(values = c("input" = "blue", "output" = "red")) +
   scale_size_manual(values = c(15)) +
   theme(legend.position = "none")
-
 # Here, X2 is a mediator
 
+## Fit SEM hypotheses ====
 # Let's use SEMs to test which structure best fits our data.
 
 set.seed(666)
@@ -312,11 +302,10 @@ ex01_sem_commoneffect2 <- sem(ex01_formula_commoneffect2, data = example01_data_
 
 summary(ex01_sem_commoneffect2)
 
+# Compare model fits with anova
 anova(ex01_sem_chain, ex01_sem_commoneffect, ex01_sem_commoncause, ex01_sem_x2effect, ex01_sem_commoneffect2, ex01_sem_mediator)
 
-
-
-# Cross validating
+## . . Cross validating ====
 models_to_cv <- 
   cvgather(
     ex01_sem_chain, 
@@ -346,16 +335,14 @@ cvsem(
   discrepancyMetric = 'GLS'
 )
 
+# We could have expected correlation between X1 and X2
 example01_data_anon %>%
   ggplot(aes(x = X1, y = X2)) +
   geom_point()
 
-###
-# Fit the model.
-# So, we think our system is either a chain, common cause, or partial mediator. Based on prior knowledge, we are confident that it is a common cause system.
-# It is bad practice to use the same data that you used to test the structure of the system to also fit your model. This is basically double-dipping or having your cake and eating it too. Prone to target leakage and overfitting which inflates your confidence in the parameter estimates.
-# You have two options: splitting the original dataset or collecting new data from the system.
+## Estimate coefficients of the model ====
 
+## . Generate additonal data ====
 set.seed(666)
 
 n <- 200
@@ -379,10 +366,12 @@ ex01_sem_new_commoncause <- sem(ex01_new_commoncause, data = example01_newdata)
 
 summary(ex01_sem_new_commoncause)
 
+## . Bootstrapping coefficients ====
 
+print("Content to come.")
 
 ###
-# Now let's simulate a slightly more complicated system for ourselves and figure out how to use an SEM.
+## Complicated data ====
 ###
 
 # Here's the structure we want to simulate.
@@ -517,3 +506,7 @@ psem_02 <-
 summary(psem_02, standardize = "none")
 
 coefs(psem_02, standardize = "none")
+
+## Extensions ====
+## . Latent variables ====
+## . COnstruct variables ====
